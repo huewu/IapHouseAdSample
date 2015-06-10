@@ -277,16 +277,27 @@ public class MainActivity extends Activity {
     }
 
     private void initGATracker() {
-        // TODO: Create tracker with your prpoerty Id.
+        // TODO: Create a tracker object with your prpoerty Id, and assign it to mAppTracker
         // Enabling AutoActivtiy Tracking and AdvertisingIdCollection
+        mAppTracker = GoogleAnalytics.getInstance(this).newTracker(YOUR_PROPERTY_ID);
+        mAppTracker.enableAdvertisingIdCollection(true);
+        mAppTracker.enableAutoActivityTracking(true);
+        mAppTracker.enableExceptionReporting(true);
     }
 
     private void initInterstitialAd() {
-        // TODO: Create InterstitialAd instance, set PlayStorePurchase Listener and Ad Unit Id.
+        // TODO: Create InterstitialAd instance, and assign it to mInterstitial field member
+        // set mPlayStorePurchasedListener Listener and Ad Unit Id.
+        mInterstitial = new InterstitialAd(this);
+        mInterstitial.setAdUnitId(YOUR_AD_UNIT_ID);
+        mInterstitial.setPlayStorePurchaseParams(mPlayStorePurchasedListener, null);
     }
 
     private void showInterstitial() {
         // TODO: If ad is loaded, show it
+        if (mInterstitial.isLoaded()) {
+            mInterstitial.show();
+        }
 
         mShowAd = false;
     }
@@ -295,6 +306,8 @@ public class MainActivity extends Activity {
         mShowAd = true;
 
         // TODO: create a request and load ad using it.
+        AdRequest request = new AdRequest.Builder().build();
+        mInterstitial.loadAd(request);
     }
 
     // Callback for when a IAP ad is finished
@@ -310,7 +323,7 @@ public class MainActivity extends Activity {
         public void onInAppPurchaseFinished(InAppPurchaseResult result) {
             // TODO: your custom process goes here, e.g., add coins after purchase.
 
-            // result.finishPurchase();
+            result.finishPurchase();
         }
     };
 

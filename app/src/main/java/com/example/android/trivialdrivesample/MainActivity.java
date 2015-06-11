@@ -91,7 +91,7 @@ public class MainActivity extends Activity {
     // GA AppTracker
     private Tracker mAppTracker;
 
-    // flag
+    // flag to indicate whether ad should be displayed or not.
     private boolean mShowAd = false;
 
     @Override
@@ -149,9 +149,13 @@ public class MainActivity extends Activity {
             if (mCurrentStage < stage) {
                 mCurrentStage = stage;
                 //cleared stage info is changed. Send GA event.
+
+                // TODO: you can build Event using HitBuilder and send Event to GA.
+                /*
                 mAppTracker.send(new HitBuilders.EventBuilder(
                         GA_CATEGORY_GAME_PROGRESS, GA_ACTION_STAGE_CLEAER)
                         .setLabel(String.valueOf(stage)).build());
+                */
                 loadInterstitial();
             }
 
@@ -279,15 +283,16 @@ public class MainActivity extends Activity {
     private void initGATracker() {
         // TODO: Create tracker with your prpoerty Id.
         // Enabling AutoActivtiy Tracking and AdvertisingIdCollection
+        mAppTracker = null;
     }
 
     private void initInterstitialAd() {
         // TODO: Create InterstitialAd instance, set PlayStorePurchase Listener and Ad Unit Id.
+        mInterstitial = null;
     }
 
     private void showInterstitial() {
         // TODO: If ad is loaded, show it
-
         mShowAd = false;
     }
 
@@ -333,10 +338,6 @@ public class MainActivity extends Activity {
                 // bought 1/4 tank of gas. So consume it.
                 Log.d(TAG, "Purchase is gas. Starting gas consumption.");
                 mHelper.consumeAsync(purchase, mConsumeFinishedListener);
-
-                mAppTracker.send(new HitBuilders.EventBuilder(
-                        GA_CATEGORY_PURCHASE
-                        , GA_ACTION_PURCHASE_GAS).build());
             }
         }
     };

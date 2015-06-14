@@ -15,13 +15,12 @@
 
 package com.example.android.trivialdrivesample;
 
-import android.annotation.TargetApi;
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
-import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
@@ -32,31 +31,42 @@ import com.example.android.trivialdrivesample.util.IabHelper;
 import com.example.android.trivialdrivesample.util.IabResult;
 import com.example.android.trivialdrivesample.util.Inventory;
 import com.example.android.trivialdrivesample.util.Purchase;
+import com.google.android.gms.ads.AdListener;
 import com.google.android.gms.ads.AdRequest;
 import com.google.android.gms.ads.InterstitialAd;
 import com.google.android.gms.ads.purchase.InAppPurchaseResult;
 import com.google.android.gms.ads.purchase.PlayStorePurchaseListener;
 import com.google.android.gms.analytics.GoogleAnalytics;
 import com.google.android.gms.analytics.HitBuilders;
-import com.google.android.gms.analytics.Logger;
 import com.google.android.gms.analytics.Tracker;
 import com.googlekorea.test.trivialdrive.R;
+
+import static android.os.Build.VERSION;
+import static android.os.Build.VERSION_CODES;
 
 public class MainActivity extends Activity {
     // Debug tag, for logging
     static final String TAG = "TrivialDrive";
 
-    // TODO: Your Google Play console App License Key is here
+    // TODO: Your Google Play console App License Key should be here
     private static final String YOUR_LICENSE_KEY = "YOUR_LICENSE_KEY";
 
     // TODO: Your Ad Unit ID is here
-    private static final String YOUR_AD_UNIT_ID = "YOUR_AD_UNIT_ID";
+    // For the testing purpose only, you can try 'ca-app-pub-2412876219430673/6669260544'
+    private static final String YOUR_AD_UNIT_ID = "ca-app-pub-2412876219430673/6669260544";
 
-    // TODO: Your Property Id is here
-    private static final String YOUR_PROPERTY_ID = "YOUR_PROPERTY_ID";
+    // TODO: Your Tracker Id is here
+    private static final String YOUR_TRACKER_ID = "YOUR_TRACKER_ID";
 
     // SKUs for our products: gas (consumable)
     private static final String SKU_GAS = "gas";
+
+    // SKUs for succesful test purchase products
+    private static final String SKU_TEST_SUCCEEDED = "android.test.purchased";
+
+    // SKUs for unsuccesful test purchase products
+    private static final String SKU_TEST_CANCELED= "android.test.canceled";
+
     // (arbitrary) request code for the purchase flow
     private static final int RC_REQUEST = 10001;
     // Graphics for the gas gauge
@@ -71,7 +81,7 @@ public class MainActivity extends Activity {
 
     // Pre-defined GA Event action constant strings
     private final static String GA_ACTION_PURCHASE_GAS = "ACTION_PURCHASE_GAS";
-    private final static String GA_ACTION_STAGE_CLEAER = "ACTION_STAGE_CLEAR";
+    private final static String GA_ACTION_STAGE_CLEAR = "ACTION_STAGE_CLEAR";
 
     // Current amount of gas in tank, in units
     private int mTank;
@@ -144,15 +154,20 @@ public class MainActivity extends Activity {
         else {
             --mTank;
             mTripDistance += 100;
-            int stage = (mTripDistance / 301) + 1;
+
+            // stage number will be increased every successful two drives.
+            int stage = (mTripDistance / 201) + 1;
 
             if (mCurrentStage < stage) {
                 mCurrentStage = stage;
-                //cleared stage info is changed. Send GA event.
+
+                // Send custom GA event.
+                // Event Category: 'CATEGORY_GAME_PROGRESS'
+                // Event Action: 'ACTION_STAGE_CLEAR'
+                // Event Label: stage number in string
                 mAppTracker.send(new HitBuilders.EventBuilder(
-                        GA_CATEGORY_GAME_PROGRESS, GA_ACTION_STAGE_CLEAER)
+                        GA_CATEGORY_GAME_PROGRESS, GA_ACTION_STAGE_CLEAR)
                         .setLabel(String.valueOf(stage)).build());
-                loadInterstitial();
             }
 
             saveData();
@@ -160,8 +175,8 @@ public class MainActivity extends Activity {
             updateUi();
             Log.d(TAG, "Vrooom. Tank is now " + mTank);
 
-            if (mShowAd) {
-                showInterstitial();
+            if (mTank < 2) {
+                requestNewInterstitial();
             }
         }
     }
@@ -185,12 +200,11 @@ public class MainActivity extends Activity {
          *        an empty string, but on a production app you should carefully generate this. */
         String payload = "";
 
-        mHelper.launchPurchaseFlow(this, SKU_GAS, RC_REQUEST,
+        mHelper.launchPurchaseFlow(this, SKU_TEST_SUCCEEDED, RC_REQUEST,
                 mPurchaseFinishedListener, payload);
     }
 
     // updates UI to reflect model
-    @TargetApi(Build.VERSION_CODES.LOLLIPOP)
     private void updateUi() {
         // update the car color to reflect premium status or lack thereof
 
@@ -200,8 +214,12 @@ public class MainActivity extends Activity {
         ((TextView)findViewById(R.id.trip_distance)).setText("DISTANCE: " + mTripDistance + "m");
         ((TextView) findViewById(R.id.stage)).setText("Stage " + mCurrentStage);
 
-        ((ImageView)findViewById(R.id.free_or_premium)).getDrawable().setTint(
-                Color.argb(255, 50 * mCurrentStage % 250, 120, 120));
+        if (VERSION.SDK_INT >= VERSION_CODES.LOLLIPOP ){
+            // If this app is running on L,
+            // let's change the color of car by using setTint method based on the stage number.
+            ((ImageView)findViewById(R.id.free_or_premium)).getDrawable().setTint(
+                    Color.argb(255, 50 * mCurrentStage % 250, 80, 80));
+        }
     }
 
     // Enables or disables the "please wait" screen.
@@ -218,7 +236,14 @@ public class MainActivity extends Activity {
     private void alert(String message) {
         AlertDialog.Builder bld = new AlertDialog.Builder(this);
         bld.setMessage(message);
-        bld.setNeutralButton("OK", null);
+        bld.setNeutralButton("OK", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                if (mShowAd) {
+                    showInterstitial();
+                }
+            }
+        });
         Log.d(TAG, "Showing alert dialog: " + message);
         bld.create().show();
     }
@@ -234,7 +259,7 @@ public class MainActivity extends Activity {
 
     private void loadData() {
         SharedPreferences sp = getPreferences(MODE_PRIVATE);
-        mTank = TANK_MAX;   //to make it easy to test features.
+        mTank = sp.getInt("tank", TANK_MAX);
         mTripDistance = sp.getInt("trip_distance", 0);
         mCurrentStage = mTripDistance / 301 + 1;
         mShowAd = sp.getBoolean("show_ad", true);
@@ -242,7 +267,7 @@ public class MainActivity extends Activity {
         Log.d(TAG, "Loaded data: trip distance= " + String.valueOf(mTripDistance));
 
         if (mShowAd) {
-            loadInterstitial();
+            requestNewInterstitial();
         }
     }
 
@@ -277,53 +302,86 @@ public class MainActivity extends Activity {
     }
 
     private void initGATracker() {
-        // TODO: Create a tracker object with your prpoerty Id, and assign it to mAppTracker
+        // Create a tracker object with your prpoerty Id, and assign it to mAppTracker
         // Enabling AutoActivtiy Tracking and AdvertisingIdCollection
-        mAppTracker = GoogleAnalytics.getInstance(this).newTracker(YOUR_PROPERTY_ID);
+        mAppTracker = GoogleAnalytics.getInstance(this).newTracker(YOUR_TRACKER_ID);
         mAppTracker.enableAdvertisingIdCollection(true);
         mAppTracker.enableAutoActivityTracking(true);
         mAppTracker.enableExceptionReporting(true);
     }
 
     private void initInterstitialAd() {
-        // TODO: Create InterstitialAd instance, and assign it to mInterstitial field member
+        // Create InterstitialAd instance,
         // set mPlayStorePurchasedListener Listener and Ad Unit Id.
         mInterstitial = new InterstitialAd(this);
-        mInterstitial.setAdUnitId(YOUR_AD_UNIT_ID);
+        mInterstitial.setAdListener(new AdListener() {
+
+            @Override
+            public void onAdOpened() {
+                super.onAdOpened();
+                Log.d(TAG, "interstitial ad is opened");
+                // Your game logic should be paused here.
+            }
+
+            @Override
+            public void onAdClosed() {
+                super.onAdClosed();
+                Log.d(TAG, "interstitial ad is closed");
+                // Your game logic should be continued here.
+            }
+        });
+
         mInterstitial.setPlayStorePurchaseParams(mPlayStorePurchasedListener, null);
+        mInterstitial.setAdUnitId(YOUR_AD_UNIT_ID);
     }
 
     private void showInterstitial() {
-        // TODO: If ad is loaded, show it
+        // If ad is loaded, show it.
         if (mInterstitial.isLoaded()) {
             mInterstitial.show();
+            mShowAd = false;
         }
-
-        mShowAd = false;
     }
 
-    private void loadInterstitial() {
-        mShowAd = true;
+    private void requestNewInterstitial() {
+        // Create a default request and load ad using it.
+        // To make sure you always request test ads, testing with live, production ads is
+        // a violation of AdMob policy and can lead to suspension of your account.
+        AdRequest request = new AdRequest.Builder()
+                .addTestDevice("YOUR_DEVICE_HASH")
+                .build();
 
-        // TODO: create a request and load ad using it.
-        AdRequest request = new AdRequest.Builder().build();
         mInterstitial.loadAd(request);
+
+        mShowAd = true;
     }
 
-    // Callback for when a IAP ad is finished
+    // Callback for when a purchase is finished via IAP house ad.
     private PlayStorePurchaseListener mPlayStorePurchasedListener = new PlayStorePurchaseListener() {
 
         @Override
         public boolean isValidPurchase(String sku) {
-            // TODO: check if the product has already been purchased.
+            Log.d(TAG, "is this Valid Purchase? : " + sku);
+            // Check if the product has already been purchased.
             return true;
         }
 
         @Override
         public void onInAppPurchaseFinished(InAppPurchaseResult result) {
-            // TODO: your custom process goes here, e.g., add coins after purchase.
 
+            // Your custom process goes here, e.g., add coins after purchase.
             result.finishPurchase();
+
+            // successfully consumed, so we apply the effects of the item in our
+            // game world's logic, which in our case means filling the gas tank a bit
+            Log.d(TAG, "Consumption successful. Provisioning.");
+            mTank = TANK_MAX;
+            saveData();
+            alert("You filled the tank.");
+
+            updateUi();
+            setWaitScreen(false);
+            Log.d(TAG, "End consumption flow.");
         }
     };
 
@@ -342,7 +400,7 @@ public class MainActivity extends Activity {
             }
 
             Log.d(TAG, "Purchase successful.");
-            if (purchase.getSku().equals(SKU_GAS)) {
+            if (purchase.getSku().equals(SKU_TEST_SUCCEEDED)) {
                 // bought 1/4 tank of gas. So consume it.
                 Log.d(TAG, "Purchase is gas. Starting gas consumption.");
                 mHelper.consumeAsync(purchase, mConsumeFinishedListener);
@@ -405,10 +463,10 @@ public class MainActivity extends Activity {
              */
 
             // Check for gas delivery -- if we own gas, we should fill up the tank immediately
-            Purchase gasPurchase = inventory.getPurchase(SKU_GAS);
+            Purchase gasPurchase = inventory.getPurchase(SKU_TEST_SUCCEEDED);
             if (gasPurchase != null) {
                 Log.d(TAG, "We have gas. Consuming it.");
-                mHelper.consumeAsync(inventory.getPurchase(SKU_GAS), mConsumeFinishedListener);
+                mHelper.consumeAsync(inventory.getPurchase(SKU_TEST_SUCCEEDED), mConsumeFinishedListener);
                 return;
             }
 
@@ -417,5 +475,4 @@ public class MainActivity extends Activity {
             Log.d(TAG, "Initial inventory query finished; enabling main UI.");
         }
     };
-
 }

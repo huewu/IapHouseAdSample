@@ -95,7 +95,7 @@ public class IabHelper {
     Context mContext;
 
     // Connection to the service
-    IInAppBillingService mService;
+    public IInAppBillingService mService;
     ServiceConnection mServiceConn;
 
     // The request code used to launch purchase flow
@@ -476,7 +476,7 @@ public class IabHelper {
                 String sku = purchase.getSku();
 
                 // Verify signature
-                if (!Security.verifyPurchase(mSignatureBase64, purchaseData, dataSignature)) {
+                if (!Security.verifyPurchase(sku, mSignatureBase64, purchaseData, dataSignature)) {
                     logError("Purchase signature verification FAILED for sku " + sku);
                     result = new IabResult(IABHELPER_VERIFICATION_FAILED, "Signature verification failed for sku " + sku);
                     if (mPurchaseListener != null) mPurchaseListener.onIabPurchaseFinished(result, purchase);
@@ -866,7 +866,7 @@ public class IabHelper {
                 String purchaseData = purchaseDataList.get(i);
                 String signature = signatureList.get(i);
                 String sku = ownedSkus.get(i);
-                if (Security.verifyPurchase(mSignatureBase64, purchaseData, signature)) {
+                if (Security.verifyPurchase(sku, mSignatureBase64, purchaseData, signature)) {
                     logDebug("Sku is owned: " + sku);
                     Purchase purchase = new Purchase(itemType, purchaseData, signature);
 

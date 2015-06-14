@@ -8,8 +8,8 @@ android {
         versionCode 7
         minSdkVersion 14
         targetSdkVersion 22
-        applicationId "com.googlekorea.test.trivialdrive"
-        //applicationId "admob.demo.iap.defaultpurchase"
+        //applicationId "com.googlekorea.test.trivialdrive"
+        applicationId "admob.demo.iap.defaultpurchase"
         versionName "1.1"
     }
 

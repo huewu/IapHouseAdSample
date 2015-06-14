@@ -43,6 +43,10 @@
 
         <activity android:name="com.google.android.gms.ads.purchase.InAppPurchaseActivity"
                   android:theme="@style/Theme.IAPTheme"/>
+        <activity
+            android:name="com.google.android.gms.ads.AdActivity"
+            android:theme="@android:style/Theme.Translucent"
+            android:configChanges="keyboard|keyboardHidden|orientation|screenLayout|uiMode|screenSize|smallestScreenSize" />
 
     </application>
 </manifest>

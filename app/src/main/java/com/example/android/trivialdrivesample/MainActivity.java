@@ -31,6 +31,7 @@ import com.example.android.trivialdrivesample.util.IabHelper;
 import com.example.android.trivialdrivesample.util.IabResult;
 import com.example.android.trivialdrivesample.util.Inventory;
 import com.example.android.trivialdrivesample.util.Purchase;
+import com.google.android.gms.ads.AdRequest;
 import com.google.android.gms.ads.InterstitialAd;
 import com.google.android.gms.ads.purchase.PlayStorePurchaseListener;
 import com.google.android.gms.analytics.GoogleAnalytics;
@@ -307,10 +308,18 @@ public class MainActivity extends Activity {
     private void initInterstitialAd() {
         // TODO: create InterstitialAd instance here,
         // set mPlayStorePurchasedListener Listener and Ad Unit Id as well.
+
+        mInterstitial = new InterstitialAd(this);
+        mInterstitial.setAdUnitId(YOUR_AD_UNIT_ID);
     }
 
     private void showInterstitial() {
         // TODO: Check whether the ad is loaded or not, and only if ad is loaded, show it.
+        // TODO: Only if ad is loaded, show it.
+        if (mInterstitial.isLoaded()) {
+            mInterstitial.show();
+            mShowAd = false;
+        }
     }
 
 
@@ -318,6 +327,12 @@ public class MainActivity extends Activity {
         // TODO: Create a default request and load ad using it.
         // To make sure you always request test ads, testing with live, production ads is
         // a violation of AdMob policy and can lead to suspension of your account.
+
+        AdRequest request = new AdRequest.Builder()
+                .addTestDevice("YOUR_DEVICE_HASH")
+                .build();
+
+        mInterstitial.loadAd(request);
         mShowAd = true;
     }
 

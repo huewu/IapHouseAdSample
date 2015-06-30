@@ -31,15 +31,13 @@ import com.example.android.trivialdrivesample.util.IabHelper;
 import com.example.android.trivialdrivesample.util.IabResult;
 import com.example.android.trivialdrivesample.util.Inventory;
 import com.example.android.trivialdrivesample.util.Purchase;
-import com.google.android.gms.ads.AdListener;
-import com.google.android.gms.ads.AdRequest;
 import com.google.android.gms.ads.InterstitialAd;
-import com.google.android.gms.ads.purchase.InAppPurchaseResult;
 import com.google.android.gms.ads.purchase.PlayStorePurchaseListener;
 import com.google.android.gms.analytics.GoogleAnalytics;
 import com.google.android.gms.analytics.HitBuilders;
 import com.google.android.gms.analytics.Tracker;
-import com.googlekorea.test.trivialdrive.R;
+
+import admob.demo.iap.defaultpurchase.R;
 
 import static android.os.Build.VERSION;
 import static android.os.Build.VERSION_CODES;
@@ -52,18 +50,14 @@ public class MainActivity extends Activity {
     private static final String YOUR_LICENSE_KEY = "YOUR_LICENSE_KEY";
 
     // TODO: Your Ad Unit ID is here
-    // For the testing purpose only, you can try 'ca-app-pub-2412876219430673/6669260544'
-    private static final String YOUR_AD_UNIT_ID = "ca-app-pub-2412876219430673/6669260544";
+    // For the testing purpose only, you can try 'ca-app-pub-2412876219430673/4320894148'
+    private static final String YOUR_AD_UNIT_ID = "ca-app-pub-2412876219430673/4320894148";
 
     // TODO: Your Tracker Id is here
     private static final String YOUR_TRACKER_ID = "YOUR_TRACKER_ID";
 
-    // SKUs for our products: gas (consumable)
-    private static final String SKU_GAS = "gas";
-
     // SKUs for succesful test purchase products
     private static final String SKU_TEST_SUCCEEDED = "android.test.purchased";
-
     // SKUs for unsuccesful test purchase products
     private static final String SKU_TEST_CANCELED= "android.test.canceled";
 
@@ -311,79 +305,25 @@ public class MainActivity extends Activity {
     }
 
     private void initInterstitialAd() {
-        // Create InterstitialAd instance,
-        // set mPlayStorePurchasedListener Listener and Ad Unit Id.
-        mInterstitial = new InterstitialAd(this);
-        mInterstitial.setAdListener(new AdListener() {
-
-            @Override
-            public void onAdOpened() {
-                super.onAdOpened();
-                Log.d(TAG, "interstitial ad is opened");
-                // Your game logic should be paused here.
-            }
-
-            @Override
-            public void onAdClosed() {
-                super.onAdClosed();
-                Log.d(TAG, "interstitial ad is closed");
-                // Your game logic should be continued here.
-            }
-        });
-
-        mInterstitial.setPlayStorePurchaseParams(mPlayStorePurchasedListener, null);
-        mInterstitial.setAdUnitId(YOUR_AD_UNIT_ID);
+        // TODO: create InterstitialAd instance here,
+        // set mPlayStorePurchasedListener Listener and Ad Unit Id as well.
     }
 
     private void showInterstitial() {
-        // If ad is loaded, show it.
-        if (mInterstitial.isLoaded()) {
-            mInterstitial.show();
-            mShowAd = false;
-        }
+        // TODO: Check whether the ad is loaded or not, and only if ad is loaded, show it.
     }
 
+
     private void requestNewInterstitial() {
-        // Create a default request and load ad using it.
+        // TODO: Create a default request and load ad using it.
         // To make sure you always request test ads, testing with live, production ads is
         // a violation of AdMob policy and can lead to suspension of your account.
-        AdRequest request = new AdRequest.Builder()
-                .addTestDevice("YOUR_DEVICE_HASH")
-                .build();
-
-        mInterstitial.loadAd(request);
-
         mShowAd = true;
     }
 
     // Callback for when a purchase is finished via IAP house ad.
-    private PlayStorePurchaseListener mPlayStorePurchasedListener = new PlayStorePurchaseListener() {
+    private PlayStorePurchaseListener mPlayStorePurchasedListener = null;
 
-        @Override
-        public boolean isValidPurchase(String sku) {
-            Log.d(TAG, "is this Valid Purchase? : " + sku);
-            // Check if the product has already been purchased.
-            return true;
-        }
-
-        @Override
-        public void onInAppPurchaseFinished(InAppPurchaseResult result) {
-
-            // Your custom process goes here, e.g., add coins after purchase.
-            result.finishPurchase();
-
-            // successfully consumed, so we apply the effects of the item in our
-            // game world's logic, which in our case means filling the gas tank a bit
-            Log.d(TAG, "Consumption successful. Provisioning.");
-            mTank = TANK_MAX;
-            saveData();
-            alert("You filled the tank.");
-
-            updateUi();
-            setWaitScreen(false);
-            Log.d(TAG, "End consumption flow.");
-        }
-    };
 
     // Callback for when a purchase is finished
     private IabHelper.OnIabPurchaseFinishedListener mPurchaseFinishedListener = new IabHelper.OnIabPurchaseFinishedListener() {

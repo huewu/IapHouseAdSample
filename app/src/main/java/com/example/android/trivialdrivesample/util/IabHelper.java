@@ -430,11 +430,12 @@ public class IabHelper {
      * @param requestCode The requestCode as you received it.
      * @param resultCode The resultCode as you received it.
      * @param data The data (Intent) as you received it.
+     * @param fromAd
      * @return Returns true if the result was related to a purchase flow and was handled;
      *     false if the result was not related to a purchase, in which case you should
      *     handle it normally.
      */
-    public boolean handleActivityResult(int requestCode, int resultCode, Intent data) {
+    public boolean handleActivityResult(int requestCode, int resultCode, Intent data, boolean fromAd) {
         IabResult result;
         if (requestCode != mRequestCode) return false;
 
@@ -472,7 +473,7 @@ public class IabHelper {
 
             Purchase purchase = null;
             try {
-                purchase = new Purchase(mPurchasingItemType, purchaseData, dataSignature);
+                purchase = new Purchase(mPurchasingItemType, purchaseData, dataSignature, fromAd);
                 String sku = purchase.getSku();
 
                 // Verify signature

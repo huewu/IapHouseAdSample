@@ -32,8 +32,13 @@ public class Purchase {
     String mToken;
     String mOriginalJson;
     String mSignature;
+    boolean mFromAd;
 
     public Purchase(String itemType, String jsonPurchaseInfo, String signature) throws JSONException {
+        this(itemType, jsonPurchaseInfo, signature, false);
+    }
+
+    public Purchase(String itemType, String jsonPurchaseInfo, String signature, boolean fromAd) throws JSONException {
         mItemType = itemType;
         mOriginalJson = jsonPurchaseInfo;
         JSONObject o = new JSONObject(mOriginalJson);
@@ -45,6 +50,7 @@ public class Purchase {
         mDeveloperPayload = o.optString("developerPayload");
         mToken = o.optString("token", o.optString("purchaseToken"));
         mSignature = signature;
+        mFromAd = fromAd;
     }
 
     public String getItemType() { return mItemType; }
@@ -57,6 +63,7 @@ public class Purchase {
     public String getToken() { return mToken; }
     public String getOriginalJson() { return mOriginalJson; }
     public String getSignature() { return mSignature; }
+    public boolean isFromAd() { return mFromAd; }
 
     @Override
     public String toString() { return "PurchaseInfo(type:" + mItemType + "):" + mOriginalJson; }

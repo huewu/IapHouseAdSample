@@ -16,6 +16,7 @@
 package com.example.android.trivialdrivesample;
 
 import android.app.Activity;
+import android.app.ActivityManager;
 import android.app.AlertDialog;
 import android.content.DialogInterface;
 import android.content.Intent;
@@ -23,6 +24,7 @@ import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.KeyEvent;
 import android.view.View;
 import android.widget.ImageView;
 import android.widget.TextView;
@@ -34,8 +36,8 @@ import com.example.android.trivialdrivesample.util.Purchase;
 import com.google.ads.conversiontracking.AdWordsConversionReporter;
 import com.google.android.gms.ads.AdRequest;
 import com.google.android.gms.ads.InterstitialAd;
-import com.google.android.gms.ads.purchase.InAppPurchaseResult;
-import com.google.android.gms.ads.purchase.PlayStorePurchaseListener;
+import com.google.android.gms.ads.purchase.InAppPurchase;
+import com.google.android.gms.ads.purchase.InAppPurchaseListener;
 import com.google.android.gms.analytics.GoogleAnalytics;
 import com.google.android.gms.analytics.HitBuilders;
 import com.google.android.gms.analytics.Tracker;
@@ -59,9 +61,9 @@ public class MainActivity extends Activity {
     // TODO: Your Tracker Id is here
     private static final String YOUR_TRACKER_ID = "YOUR_TRACKER_ID";
 
-    // SKUs for succesful test purchase products
+    // SKUs for successful test purchase products
     private static final String SKU_TEST_SUCCEEDED = "android.test.purchased";
-    // SKUs for unsuccesful test purchase products
+    // SKUs for unsuccessful test purchase products
     private static final String SKU_TEST_CANCELED= "android.test.canceled";
 
     // (arbitrary) request code for the purchase flow
@@ -101,6 +103,10 @@ public class MainActivity extends Activity {
     // flag to indicate whether ad should be displayed or not.
     private boolean mShowAd = false;
 
+    // flag to indicate whether the purchase was made from IAP Ad or not.
+    private boolean mFromAd = false;
+    private InAppPurchase mInAppPurchase = null;
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -136,7 +142,7 @@ public class MainActivity extends Activity {
         if (mHelper == null) return;
 
         // Pass on the activity result to the helper for handling
-        if (!mHelper.handleActivityResult(requestCode, resultCode, data)) {
+        if (!mHelper.handleActivityResult(requestCode, resultCode, data, mFromAd)) {
             // not handled, so handle it ourselves (here's where you'd
             // perform any handling of activity results not related to in-app
             // billing...
@@ -200,6 +206,7 @@ public class MainActivity extends Activity {
          *        an empty string, but on a production app you should carefully generate this. */
         String payload = "";
 
+        mFromAd = false;
         mHelper.launchPurchaseFlow(this, SKU_TEST_SUCCEEDED, RC_REQUEST,
                 mPurchaseFinishedListener, payload);
     }
@@ -253,7 +260,7 @@ public class MainActivity extends Activity {
         spe.putInt("tank", mTank);
         spe.putInt("trip_distance", mTripDistance);
         spe.putBoolean("show_ad", mShowAd);
-        spe.commit();
+        spe.apply();
         Log.d(TAG, "Saved data: tank = " + String.valueOf(mTank));
     }
 
@@ -321,15 +328,15 @@ public class MainActivity extends Activity {
         // null for parameter publicKey is acceptable
         // but SDK will work in developer mode and skip verifying purchase data signature
         // with public key.
-        mInterstitial.setPlayStorePurchaseParams(mPlayStorePurchasedListener, null);
+        mInterstitial.setInAppPurchaseListener(mInAppPurchaseListener);
     }
 
     private void showInterstitial() {
         // TODO: Check whether the ad is loaded or not, and only if ad is loaded, show it.
         if (mInterstitial.isLoaded()) {
             mInterstitial.show();
-
             mShowAd = false;
+            saveData();
         }
     }
 
@@ -342,47 +349,48 @@ public class MainActivity extends Activity {
     }
 
     // Callback for when a purchase is finished via IAP house ad.
-    private PlayStorePurchaseListener mPlayStorePurchasedListener = new PlayStorePurchaseListener() {
+    private InAppPurchaseListener mInAppPurchaseListener = new InAppPurchaseListener() {
 
         @Override
-        public boolean isValidPurchase(String sku) {
-            Log.d(TAG, "is this Valid Purchase? : " + sku);
-            // Check if the product has already been purchased.
-            return true;
-        }
+        public void onInAppPurchaseRequested(InAppPurchase inAppPurchase) {
+            /* TODO: for security, generate your payload here for verification. See the comments on
+             *        verifyDeveloperPayload() for more info. Since this is a SAMPLE, we just use
+             *        an empty string, but on a production app you should carefully generate this. */
 
-        @Override
-        public void onInAppPurchaseFinished(InAppPurchaseResult result) {
+            // launch the gas purchase UI flow.
+            // We will be notified of completion via mPurchaseFinishedListener
+            setWaitScreen(true);
+            Log.d(TAG, "Launching purchase flow for gas from Ad.");
 
-            if (result.getResultCode() < 0) {
-                Log.d(TAG, "Purchase was failed with error code: " + result.getResultCode());
-                return;
-            }
+            final String payload = "";
+            mFromAd = true;
+            mInAppPurchase = inAppPurchase;
 
-            // Your custom process goes here, e.g., add coins after purchase.
-            result.finishPurchase();
+            // close interstitial ad.
+            Intent intent = new Intent(MainActivity.this, MainActivity.class);
+            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            startActivity(intent);
 
-            // successfully consumed, so we apply the effects of the item in our
-            // game world's logic, which in our case means filling the gas tank a bit
-            Log.d(TAG, "Consumption successful. Provisioning.");
-            mTank = TANK_MAX;
-            saveData();
-            alert("You filled the tank.");
-
-            updateUi();
-            setWaitScreen(false);
-            Log.d(TAG, "End consumption flow.");
+            mHelper.launchPurchaseFlow(MainActivity.this, inAppPurchase.getProductId(), RC_REQUEST,
+                    mPurchaseFinishedListener, payload);
         }
     };
 
 
     // Callback for when a purchase is finished
-    private IabHelper.OnIabPurchaseFinishedListener mPurchaseFinishedListener = new IabHelper.OnIabPurchaseFinishedListener() {
+    private IabHelper.OnIabPurchaseFinishedListener mPurchaseFinishedListener
+            = new IabHelper.OnIabPurchaseFinishedListener() {
+
         public void onIabPurchaseFinished(IabResult result, Purchase purchase) {
             Log.d(TAG, "Purchase finished: " + result + ", purchase: " + purchase);
 
             // if we were disposed of in the meantime, quit.
             if (mHelper == null) return;
+
+            if (mFromAd && mInAppPurchase != null) {
+                // send conversion ping to AdMob
+                mInAppPurchase.recordPlayBillingResolution(result.getResponse());
+            }
 
             if (result.isFailure()) {
                 complain("Error purchasing: " + result);

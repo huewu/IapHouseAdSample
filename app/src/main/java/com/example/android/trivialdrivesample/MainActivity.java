@@ -31,7 +31,9 @@ import com.example.android.trivialdrivesample.util.IabHelper;
 import com.example.android.trivialdrivesample.util.IabResult;
 import com.example.android.trivialdrivesample.util.Inventory;
 import com.example.android.trivialdrivesample.util.Purchase;
+import com.google.android.gms.ads.AdRequest;
 import com.google.android.gms.ads.InterstitialAd;
+import com.google.android.gms.ads.purchase.InAppPurchaseResult;
 import com.google.android.gms.ads.purchase.PlayStorePurchaseListener;
 import com.google.android.gms.analytics.GoogleAnalytics;
 import com.google.android.gms.analytics.HitBuilders;
@@ -56,9 +58,9 @@ public class MainActivity extends Activity {
     // TODO: Your Tracker Id is here
     private static final String YOUR_TRACKER_ID = "YOUR_TRACKER_ID";
 
-    // SKUs for succesful test purchase products
+    // SKUs for successful test purchase products
     private static final String SKU_TEST_SUCCEEDED = "android.test.purchased";
-    // SKUs for unsuccesful test purchase products
+    // SKUs for unsuccessful test purchase products
     private static final String SKU_TEST_CANCELED= "android.test.canceled";
 
     // (arbitrary) request code for the purchase flow
@@ -247,7 +249,7 @@ public class MainActivity extends Activity {
         spe.putInt("tank", mTank);
         spe.putInt("trip_distance", mTripDistance);
         spe.putBoolean("show_ad", mShowAd);
-        spe.commit();
+        spe.apply();
         Log.d(TAG, "Saved data: tank = " + String.valueOf(mTank));
     }
 
@@ -307,10 +309,18 @@ public class MainActivity extends Activity {
     private void initInterstitialAd() {
         // TODO: create InterstitialAd instance here,
         // set mPlayStorePurchasedListener Listener and Ad Unit Id as well.
+        mInterstitial = new InterstitialAd(this);
+        mInterstitial.setAdUnitId(YOUR_AD_UNIT_ID);
+        mInterstitial.setPlayStorePurchaseParams(mPlayStorePurchasedListener, null);
     }
 
     private void showInterstitial() {
         // TODO: Check whether the ad is loaded or not, and only if ad is loaded, show it.
+        // TODO: Only if ad is loaded, show it.
+        if (mInterstitial.isLoaded()) {
+            mInterstitial.show();
+            mShowAd = false;
+        }
     }
 
 
@@ -318,12 +328,49 @@ public class MainActivity extends Activity {
         // TODO: Create a default request and load ad using it.
         // To make sure you always request test ads, testing with live, production ads is
         // a violation of AdMob policy and can lead to suspension of your account.
+        // TODO: Create a default request and load ad using it.
+        // To make sure you always request test ads, testing with live, production ads is
+        // a violation of AdMob policy and can lead to suspension of your account.
+        AdRequest request = new AdRequest.Builder()
+                .addTestDevice("YOUR_DEVICE_HASH")
+                .build();
+
+        mInterstitial.loadAd(request);
         mShowAd = true;
     }
 
     // Callback for when a purchase is finished via IAP house ad.
-    private PlayStorePurchaseListener mPlayStorePurchasedListener = null;
+    private PlayStorePurchaseListener mPlayStorePurchasedListener = new PlayStorePurchaseListener() {
 
+        @Override
+        public boolean isValidPurchase(String sku) {
+            Log.d(TAG, "is this Valid Purchase? : " + sku);
+            // Check if the product has already been purchased.
+            return true;
+        }
+
+        @Override
+        public void onInAppPurchaseFinished(InAppPurchaseResult result) {
+
+            if (result.getResultCode() < 0) {
+                Log.d(TAG, "Purchase was failed with error code: " + result.getResultCode());
+                return;
+            }
+
+            // Your custom process goes here, e.g., add coins after purchase.
+            result.finishPurchase();
+
+            // successfully consumed, so we apply the effects of the item in our
+            // game world's logic, which in our case means filling the gas tank a bit
+            Log.d(TAG, "Consumption successful. Provisioning.");
+            mTank = TANK_MAX;
+            saveData();
+            alert("You filled the tank.");
+
+            updateUi();
+            setWaitScreen(false);
+            Log.d(TAG, "End consumption flow.");        }
+    };
 
     // Callback for when a purchase is finished
     private IabHelper.OnIabPurchaseFinishedListener mPurchaseFinishedListener = new IabHelper.OnIabPurchaseFinishedListener() {

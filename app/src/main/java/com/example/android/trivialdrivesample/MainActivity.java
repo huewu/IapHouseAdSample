@@ -354,24 +354,32 @@ public class MainActivity extends Activity {
         @Override
         public void onInAppPurchaseFinished(InAppPurchaseResult result) {
 
-            if (result.getResultCode() < 0) {
+            if (result.getResultCode() != Activity.RESULT_OK) {
                 Log.d(TAG, "Purchase was failed with error code: " + result.getResultCode());
                 return;
             }
 
-            // Your custom process goes here, e.g., add coins after purchase.
-            result.finishPurchase();
+            if (result.isVerified()) {
+                // Your custom process goes here, e.g., add coins after purchase.
+                result.finishPurchase();
 
-            // successfully consumed, so we apply the effects of the item in our
-            // game world's logic, which in our case means filling the gas tank a bit
-            Log.d(TAG, "Consumption successful. Provisioning.");
-            mTank = TANK_MAX;
-            saveData();
-            alert("You filled the tank.");
-
-            updateUi();
-            setWaitScreen(false);
-            Log.d(TAG, "End consumption flow.");
+                // successfully consumed, so we apply the effects of the item in our
+                // game world's logic, which in our case means filling the gas tank a bit
+                Log.d(TAG, "Consumption successful. Provisioning.");
+                mTank = TANK_MAX;
+                saveData();
+                alert("You filled the tank.");
+                updateUi();
+                setWaitScreen(false);
+                Log.d(TAG, "End consumption flow.");
+            } else {
+                Log.d(TAG, "Fail to verify the purchase.");
+                final Intent data = result.getPurchaseData();
+                final String purchaseData = data.getStringExtra("INAPP_PURCHASE_DATA");
+                final String dataSignature = data.getStringExtra("INAPP_DATA_SIGNATURE");
+                Log.d(TAG, "Purchase was failed with data: " + purchaseData);
+                Log.d(TAG, "Purchase was failed with signature: " + dataSignature);
+            }
         }
     };
 

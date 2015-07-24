@@ -16,7 +16,6 @@
 package com.example.android.trivialdrivesample;
 
 import android.app.Activity;
-import android.app.ActivityManager;
 import android.app.AlertDialog;
 import android.content.DialogInterface;
 import android.content.Intent;
@@ -24,7 +23,6 @@ import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.util.Log;
-import android.view.KeyEvent;
 import android.view.View;
 import android.widget.ImageView;
 import android.widget.TextView;
@@ -55,8 +53,8 @@ public class MainActivity extends Activity {
     private static final String YOUR_LICENSE_KEY = "YOUR_LICENSE_KEY";
 
     // TODO: Your Ad Unit ID is here
-    // For the testing purpose only, you can try 'ca-app-pub-2412876219430673/4320894148'
-    private static final String YOUR_AD_UNIT_ID = "ca-app-pub-2412876219430673/4320894148";
+    private static final String AD_UNIT_ID_WITH_UPGRADE = "ca-app-pub-3940256099942544/1033173712";
+    private static final String AD_UNIT_ID_WITHOUT_UPGRADE = "ca-app-pub-2412876219430673/4320894148";
 
     // TODO: Your Tracker Id is here
     private static final String YOUR_TRACKER_ID = "YOUR_TRACKER_ID";
@@ -81,6 +79,13 @@ public class MainActivity extends Activity {
     // Pre-defined GA Event action constant strings
     private final static String GA_ACTION_PURCHASE_GAS = "ACTION_PURCHASE_GAS";
     private final static String GA_ACTION_STAGE_CLEAR = "ACTION_STAGE_CLEAR";
+
+
+    // Whether a user has an upgrade or not
+    private boolean mHasUpgrade = false;
+
+    // Upgrade Purchase information
+    private Purchase mUpgradePurchase;
 
     // Current amount of gas in tank, in units
     private int mTank;
@@ -107,17 +112,17 @@ public class MainActivity extends Activity {
     private boolean mFromAd = false;
     private InAppPurchase mInAppPurchase = null;
 
+    private int mNumberOfDriveClick = 0;
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
         initIAPHelper();
-        initInterstitialAd();
         initGATracker();
 
-        // load game data
-        loadData();
+        setWaitScreen(true);
 
         AdWordsConversionReporter.registerReferrer(this.getApplicationContext(),
                 this.getIntent().getData());
@@ -156,11 +161,13 @@ public class MainActivity extends Activity {
     // Drive button clicked. Burn gas!
     public void onDriveButtonClicked(View arg0) {
         Log.d(TAG, "Drive button clicked.");
-        if (mTank <= 0) alert("Oh, no! You are out of gas! Try buying some!");
-        else {
-            --mTank;
-            mTripDistance += 100;
+        if (mTank <= 0) {
+            alert("Oh, no! You are out of gas! Try buying some!");
+        } else {
 
+            if (!mHasUpgrade) --mTank;
+
+            mTripDistance += 100;
             // stage number will be increased every successful two drives.
             int stage = (mTripDistance / 201) + 1;
 
@@ -180,40 +187,53 @@ public class MainActivity extends Activity {
             alert("Vroooom, you drove 100m.");
             updateUi();
             Log.d(TAG, "Vrooom. Tank is now " + mTank);
+        }
 
-            if (mTank < 2) {
-                requestNewInterstitial();
-            }
+        ++mNumberOfDriveClick;
+
+        if (mNumberOfDriveClick % 3 == 0) {
+            requestNewInterstitial();
         }
     }
 
-    // User clicked the "Buy Gas" button
-    public void onBuyGasButtonClicked(View arg0) {
-        Log.d(TAG, "Buy gas button clicked.");
+    // User clicked the "Buy Upgrade" button
+    public void onBuyUpgradeClicked(View arg0) {
 
-        if (mTank >= TANK_MAX) {
-            complain("Your tank is full. Drive around a bit!");
-            return;
-        }
-
-        // launch the gas purchase UI flow.
+        // launch the upgrade purchase UI flow.
         // We will be notified of completion via mPurchaseFinishedListener
         setWaitScreen(true);
-        Log.d(TAG, "Launching purchase flow for gas.");
 
+        if (mHasUpgrade) {
+            //downgrade the car, aka, consume the product
+            mHelper.consumeAsync(mUpgradePurchase, mConsumeFinishedListener);
+        } else {
+            Log.d(TAG, "Launching purchase flow for Upgrade.");
         /* TODO: for security, generate your payload here for verification. See the comments on
          *        verifyDeveloperPayload() for more info. Since this is a SAMPLE, we just use
          *        an empty string, but on a production app you should carefully generate this. */
-        String payload = "";
-
-        mFromAd = false;
-        mHelper.launchPurchaseFlow(this, SKU_TEST_SUCCEEDED, RC_REQUEST,
-                mPurchaseFinishedListener, payload);
+            String payload = "";
+            mFromAd = false;
+            mHelper.launchPurchaseFlow(this, SKU_TEST_SUCCEEDED, RC_REQUEST,
+                    mPurchaseFinishedListener, payload);
+        }
     }
 
     // updates UI to reflect model
     private void updateUi() {
         // update the car color to reflect premium status or lack thereof
+        if (mHasUpgrade) {
+            ((ImageView)findViewById(R.id.free_or_premium)).setImageDrawable(
+                    getResources().getDrawable(R.drawable.premium));
+
+            ((ImageView)findViewById(R.id.upgrade_or_downgrade)).setImageDrawable(
+                    getResources().getDrawable(R.drawable.downgrade_app));
+        } else {
+            ((ImageView)findViewById(R.id.free_or_premium)).setImageDrawable(
+                    getResources().getDrawable(R.drawable.free));
+
+            ((ImageView)findViewById(R.id.upgrade_or_downgrade)).setImageDrawable(
+                    getResources().getDrawable(R.drawable.upgrade_app));
+        }
 
         // update gas gauge to reflect tank status
         int index = mTank >= TANK_RES_IDS.length ? TANK_RES_IDS.length - 1 : mTank;
@@ -224,8 +244,12 @@ public class MainActivity extends Activity {
         if (VERSION.SDK_INT >= VERSION_CODES.LOLLIPOP ){
             // If this app is running on L,
             // let's change the color of car by using setTint method based on the stage number.
-            ((ImageView)findViewById(R.id.free_or_premium)).getDrawable().setTint(
-                    Color.argb(255, 50 * mCurrentStage % 250, 80, 80));
+            if (mTank == TANK_MAX) {
+                ((ImageView)findViewById(R.id.gas_gauge)).getDrawable().setTint(
+                        Color.argb(255, 90, 200, 90));
+            } else {
+                ((ImageView)findViewById(R.id.gas_gauge)).getDrawable().setColorFilter(null);
+            }
         }
     }
 
@@ -266,7 +290,13 @@ public class MainActivity extends Activity {
 
     private void loadData() {
         SharedPreferences sp = getPreferences(MODE_PRIVATE);
-        mTank = sp.getInt("tank", TANK_MAX);
+
+        if (mHasUpgrade) {
+            mTank = TANK_MAX;
+        } else {
+            mTank = sp.getInt("tank", TANK_MAX);
+        }
+
         mTripDistance = sp.getInt("trip_distance", 0);
         mCurrentStage = mTripDistance / 301 + 1;
         mShowAd = sp.getBoolean("show_ad", true);
@@ -323,12 +353,17 @@ public class MainActivity extends Activity {
         // TODO: create InterstitialAd instance here,
         // set mPlayStorePurchasedListener Listener and Ad Unit Id as well.
         mInterstitial = new InterstitialAd(this);
-        mInterstitial.setAdUnitId(YOUR_AD_UNIT_ID);
 
-        // null for parameter publicKey is acceptable
-        // but SDK will work in developer mode and skip verifying purchase data signature
-        // with public key.
-        mInterstitial.setInAppPurchaseListener(mInAppPurchaseListener);
+        if (mHasUpgrade) {
+            mInterstitial.setAdUnitId(AD_UNIT_ID_WITH_UPGRADE);
+        } else {
+            mInterstitial.setAdUnitId(AD_UNIT_ID_WITHOUT_UPGRADE);
+            // null for parameter publicKey is acceptable
+            // but SDK will work in developer mode and skip verifying purchase data signature
+            // with public key.
+            mInterstitial.setInAppPurchaseListener(mInAppPurchaseListener);
+
+        }
     }
 
     private void showInterstitial() {
@@ -398,11 +433,18 @@ public class MainActivity extends Activity {
                 return;
             }
 
-            Log.d(TAG, "Purchase successful.");
-            if (purchase.getSku().equals(SKU_TEST_SUCCEEDED)) {
-                // bought 1/4 tank of gas. So consume it.
-                Log.d(TAG, "Purchase is gas. Starting gas consumption.");
-                mHelper.consumeAsync(purchase, mConsumeFinishedListener);
+            final String sku = purchase.getSku();
+            Log.d(TAG, "Purchase successful: " + sku + ":" + purchase.getOriginalJson());
+            if (sku.equals(SKU_TEST_SUCCEEDED)) {
+                Log.d(TAG, "Purchase is upgrade. Applying upgrade.");
+                mHasUpgrade = true;
+                mUpgradePurchase = purchase;
+                mTank = TANK_MAX;
+                initInterstitialAd();
+                updateUi();
+                setWaitScreen(false);
+                Log.d(TAG, "End consumption flow.");
+                alert("You just purchased a premium upgrade car..");
             }
         }
     };
@@ -424,12 +466,16 @@ public class MainActivity extends Activity {
                 Log.d(TAG, "Consumption successful. Provisioning.");
                 mTank = TANK_MAX;
                 saveData();
-                alert("You filled the tank.");
+                mUpgradePurchase = null;
+                mHasUpgrade = false;
+                alert("For testing, you consume a non-consumable item..");
             }
             else {
                 complain("Error while consuming: " + result);
             }
+
             updateUi();
+            initInterstitialAd();
             setWaitScreen(false);
             Log.d(TAG, "End consumption flow.");
         }
@@ -451,21 +497,15 @@ public class MainActivity extends Activity {
 
             Log.d(TAG, "Query inventory was successful.");
 
-            /*
-             * Check for items we own. Notice that for each purchase, we check
-             * the developer payload to see if it's correct! See
-             * verifyDeveloperPayload().
-             */
+            // Check for upgrade is purchased or not
+            // if we own upgrade, we will display normal ad instead
+            mUpgradePurchase = inventory.getPurchase(SKU_TEST_SUCCEEDED);
+            mHasUpgrade = mUpgradePurchase != null;
 
-            // Check for gas delivery -- if we own gas, we should fill up the tank immediately
-            Purchase gasPurchase = inventory.getPurchase(SKU_TEST_SUCCEEDED);
-            if (gasPurchase != null) {
-                Log.d(TAG, "We have gas. Consuming it.");
-                mHelper.consumeAsync(inventory.getPurchase(SKU_TEST_SUCCEEDED), mConsumeFinishedListener);
-                return;
-            }
-
+            loadData();
+            initInterstitialAd();
             updateUi();
+
             setWaitScreen(false);
             Log.d(TAG, "Initial inventory query finished; enabling main UI.");
         }

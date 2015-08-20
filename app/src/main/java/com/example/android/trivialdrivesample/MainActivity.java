@@ -33,7 +33,9 @@ import com.example.android.trivialdrivesample.util.IabHelper;
 import com.example.android.trivialdrivesample.util.IabResult;
 import com.example.android.trivialdrivesample.util.Inventory;
 import com.example.android.trivialdrivesample.util.Purchase;
+import com.example.android.trivialdrivesample.util.TransactionTrackHelper;
 import com.google.ads.conversiontracking.AdWordsConversionReporter;
+import com.google.android.gms.ads.AdListener;
 import com.google.android.gms.ads.AdRequest;
 import com.google.android.gms.ads.InterstitialAd;
 import com.google.android.gms.ads.purchase.InAppPurchase;
@@ -59,7 +61,9 @@ public class MainActivity extends Activity {
     private static final String YOUR_AD_UNIT_ID = "ca-app-pub-2412876219430673/4320894148";
 
     // TODO: Your Tracker Id is here
-    private static final String YOUR_TRACKER_ID = "YOUR_TRACKER_ID";
+    // UA-50933813-5
+
+    private static final String YOUR_TRACKER_ID = "UA-50933813-5";
 
     // SKUs for successful test purchase products
     private static final String SKU_TEST_SUCCEEDED = "android.test.purchased";
@@ -329,6 +333,13 @@ public class MainActivity extends Activity {
         // but SDK will work in developer mode and skip verifying purchase data signature
         // with public key.
         mInterstitial.setInAppPurchaseListener(mInAppPurchaseListener);
+        mInterstitial.setAdListener(new AdListener() {
+            @Override
+            public void onAdOpened() {
+                super.onAdOpened();
+                TransactionTrackHelper.sendProductImpressionPing(mAppTracker, "gas", "Gas Package");
+            }
+        });
     }
 
     private void showInterstitial() {
@@ -371,6 +382,8 @@ public class MainActivity extends Activity {
             intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
             startActivity(intent);
 
+
+            TransactionTrackHelper.sendProductClickedPing(mAppTracker, "gas", "Gas Package");
             mHelper.launchPurchaseFlow(MainActivity.this, inAppPurchase.getProductId(), RC_REQUEST,
                     mPurchaseFinishedListener, payload);
         }
@@ -402,6 +415,8 @@ public class MainActivity extends Activity {
             if (purchase.getSku().equals(SKU_TEST_SUCCEEDED)) {
                 // bought 1/4 tank of gas. So consume it.
                 Log.d(TAG, "Purchase is gas. Starting gas consumption.");
+
+                TransactionTrackHelper.sendProductPurchasedPing(mAppTracker, "gas", "Gas Package");
                 mHelper.consumeAsync(purchase, mConsumeFinishedListener);
             }
         }

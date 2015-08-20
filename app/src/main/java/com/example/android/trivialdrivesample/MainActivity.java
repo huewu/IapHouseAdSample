@@ -61,9 +61,7 @@ public class MainActivity extends Activity {
     private static final String YOUR_AD_UNIT_ID = "ca-app-pub-2412876219430673/4320894148";
 
     // TODO: Your Tracker Id is here
-    // UA-50933813-5
-
-    private static final String YOUR_TRACKER_ID = "UA-50933813-5";
+    private static final String YOUR_TRACKER_ID = "YOUR_TRACKER_ID";
 
     // SKUs for successful test purchase products
     private static final String SKU_TEST_SUCCEEDED = "android.test.purchased";
